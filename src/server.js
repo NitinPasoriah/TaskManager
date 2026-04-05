@@ -6,11 +6,18 @@ const connectDB = require('./config/db');
 const { setSocketServer } = require('./services/realtime');
 const { verifyToken } = require('./utils/token');
 const User = require('./models/User');
+const logger = require('./utils/logger');
 
 const port = process.env.PORT || 5000;
 
 async function startServer() {
-  await connectDB();
+  try {
+    await connectDB();
+    logger.info('Connected to MongoDB');
+  } catch (error) {
+    logger.error('MongoDB connection failed', error);
+    throw error;
+  }
 
   const server = http.createServer(app);
   const io = new Server(server, {
@@ -52,11 +59,11 @@ async function startServer() {
   setSocketServer(io);
 
   server.listen(port, () => {
-    console.log(`TaskManager API listening on port ${port}`);
+    logger.info(`TaskManager API listening on port ${port}`);
   });
 }
 
 startServer().catch((error) => {
-  console.error('Failed to start server:', error);
+  logger.error('Failed to start server', error);
   process.exit(1);
 });

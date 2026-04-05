@@ -2,7 +2,13 @@ const User = require('../models/User');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const { signToken } = require('../utils/token');
+const logger = require('../utils/logger');
 
+/**
+ * Build standardized token response with user data and JWT
+ * @param {Object} user - Mongoose user document
+ * @returns {Object} Response payload with user and token
+ */
 function buildTokenResponse(user) {
   return {
     user: user.toSafeObject(),
@@ -10,15 +16,22 @@ function buildTokenResponse(user) {
   };
 }
 
+/**
+ * Register a new user account
+ * @route POST /api/auth/register
+ */
 const register = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
 
   const existingUser = await User.findOne({ email });
   if (existingUser) {
+    logger.warn('Registration attempted with existing email', { email });
     throw new ApiError(409, 'Email is already registered');
   }
 
   const user = await User.create({ name, email, password });
+  logger.info('New user registered', { userId: user._id, email });
+
   res.status(201).json({
     success: true,
     message: 'Account created successfully',
@@ -26,18 +39,26 @@ const register = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Authenticate user and return JWT
+ * @route POST /api/auth/login
+ */
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
   const user = await User.findOne({ email }).select('+password');
   if (!user) {
+    logger.warn('Login failed: user not found', { email });
     throw new ApiError(401, 'Invalid email or password');
   }
 
   const validPassword = await user.matchPassword(password);
   if (!validPassword) {
+    logger.warn('Login failed: invalid password', { email });
     throw new ApiError(401, 'Invalid email or password');
   }
+
+  logger.info('User logged in', { userId: user._id, email });
 
   res.json({
     success: true,
